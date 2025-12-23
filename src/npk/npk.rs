@@ -20,8 +20,8 @@ impl Access for Npk{
         let mut head_byte =  [0 as u8,20];
         let len = r.read_exact(&mut self.head).unwrap();
         let mut img_count_byte:[u8;4] = [self.head[16],self.head[17],self.head[18],self.head[19]];
-        let img_count =  i32::from_le_bytes(img_count_byte);
-        let 
+        self.img_count =  i32::from_le_bytes(img_count_byte);
+        
 
 
         // r.read(&self.head);

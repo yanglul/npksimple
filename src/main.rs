@@ -6,7 +6,7 @@ use std::fs::File;
 mod npk;
 use crate::npk::img::Access;
 use std::io::BufReader;
-use crate::npk::NPK::Npk;
+use crate::npk::npk::Npk;
 
 
 fn setup(
@@ -19,11 +19,11 @@ fn setup(
 }
 fn main() {
     //加载文件
-    let file = File::open("ImagePacks2/sprite_charater.NPK").unwrap();
+    let file = File::open("ImagePacks2/sprite_character.NPK").unwrap();
     let mut reader = BufReader::new(file);
-    let npk = Npk::default();
+    let mut npk = Npk::default();
     npk.read(&mut reader);
-    let s = i16::from_le_bytes()
+ 
 
      App::new()
         .add_plugins(DefaultPlugins)

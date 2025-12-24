@@ -178,3 +178,59 @@ impl Frame for DdsImageFrame{
     fn as_any(&self) -> &dyn Any {self}
     fn as_any_mut(&mut self) -> &mut dyn Any {self}
 }
+
+
+pub struct V2img{
+    versin:i32,
+    name:String,
+    frames:Vec<Box<dyn Frame>>
+}
+
+static MAX_COLOR_SIZE:i32 = 255;
+use image::Rgba; 
+pub struct Palette{
+    colors:Vec<Rgba<u8>>
+
+}
+
+pub struct V4img{
+    versin:i32,
+    name:String,
+    palette:Palette,
+    frames:Vec<Box<dyn Frame>>
+}
+
+
+
+
+static DDS_IMAGE:&str = "DDS";
+
+pub struct DDS{
+    title:i32,
+    pixel_format: i32,
+    index:i32,
+    full_length:i32,
+    length:i32,
+    width:i32,
+    height:i32,
+    raw_data:Vec<u8>
+}
+
+use indexmap::IndexMap;
+pub struct Ddsable{
+    idxm:IndexMap<i32,DDS>
+}
+
+pub struct V5img{
+    versin:i32,
+    name:String,
+    dds_table:Ddsable,
+    frames:Vec<Box<dyn Frame>>
+}
+
+pub struct V6img{
+    versin:i32,
+    name:String,
+    palettes:Vec<Palette>,
+    frames:Vec<Box<dyn Frame>>
+}

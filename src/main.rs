@@ -4,7 +4,7 @@ use std::fs::File;
 mod npkin;
 use crate::npkin::img::Access;
 use std::io::BufReader;
-use crate::npkin::NPK::Npk;
+use crate::npkin::npk::Npk;
 
 fn setup(
     mut commands: Commands,

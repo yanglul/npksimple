@@ -1,6 +1,6 @@
  
 pub mod img;
-pub mod NPK;
+pub mod npk;
 pub mod oggv;
 static NPK_MAGIC: [u8; 16] = [b'N', b'e', b'o', b'p', b'l', b'e', b'P', b'a', b'c', b'k', b'_', b'B', b'i', b'l', b'l', b'\0'];  
 

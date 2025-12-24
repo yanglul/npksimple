@@ -6177,6 +6177,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "image",
+ "indexmap",
  "sha2",
  "tokio",
 ]

@@ -1,13 +1,10 @@
 
 use bevy::prelude::*;
-use bevy::camera::*;
-use bevy::sprite::*;
 use std::fs::File;
-mod npk;
-use crate::npk::img::Access;
+mod npkin;
+use crate::npkin::img::Access;
 use std::io::BufReader;
-use crate::npk::npk::Npk;
-
+use crate::npkin::NPK::Npk;
 
 fn setup(
     mut commands: Commands,
@@ -20,9 +17,9 @@ fn setup(
 fn main() {
     //加载文件
     let file = File::open("ImagePacks2/sprite_character.NPK").unwrap();
-    let mut reader = BufReader::new(file);
+    let mut reader: BufReader<File> = BufReader::new(file);
     let mut npk = Npk::default();
-    npk.read(&mut reader);
+    npk.read(reader);
  
 
      App::new()

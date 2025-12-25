@@ -1,6 +1,3 @@
- 
-use bevy::tasks::futures_lite::io::BufWriter;
-
 use crate::npkin::img::Imgindex;
 use crate::npkin::oggv::Ogg;
 
@@ -15,7 +12,7 @@ pub struct Npk{
     //图片数量
     pub img_count:i32,
     //ogg信息
-    pub textures: Vec<Ogg>,
+    pub textures: Vec<Box<dyn Access>>,
 
 
 
@@ -73,9 +70,7 @@ impl Access for Npk{
         Ok(())
     }
 
-    fn write<W: Write>(&mut self, w:std::io::BufWriter<W>)->Result<()>{
-        Ok(())
-    }
+ 
 
 
 }

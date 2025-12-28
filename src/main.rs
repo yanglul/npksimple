@@ -2,7 +2,6 @@
 use bevy::prelude::*;
 use std::fs::File;
 mod npkin;
-use crate::npkin::img::Access;
 use std::io::BufReader;
 use crate::npkin::npk::Npk;
 

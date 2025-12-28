@@ -3,10 +3,8 @@ use std::io::{BufReader,BufWriter,Read,Write,Seek};
 use std::fs::File;
 use std::ops::Deref;
 
-pub trait Access{
-    fn read (&mut self, r:BufReader<File>)->std::io::Result<()>;
 
-}
+ 
 #[derive( Debug)]
 pub struct Imgindex{
     //偏移量
@@ -66,6 +64,7 @@ pub enum COMPRESSEDT{
 
 
  
+use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::utils::default;
 use image::{ImageBuffer,RgbaImage };
 #[derive(Debug,Clone)]
@@ -148,6 +147,9 @@ impl ReferenceFrame{
     fn default() -> Self {
         ReferenceFrame{reference:0,tp:TYPE_REFERENCE,frame:Box::new(ImageFrame::default())}
     }
+    fn set_ref(&mut self,bf:Box<dyn Frame>){
+        self.frame = bf;
+    }
 }
 
 impl Frame for ReferenceFrame{
@@ -194,20 +196,137 @@ impl Frame for DdsImageFrame{
     fn reference_push_back(&mut self, _: usize) { todo!() }
 }
 
-
 pub struct V2img{
     versin:i32,
     name:String,
+    frames_size:i32,
     frames:Vec<Box<dyn Frame>>
 }
+use crate::npkin::NPK_MAGIC;
+fn verify_magic(mc:[u8;16]){
+    for i in 0..16{
+        if NPK_MAGIC[i]!=mc[i]{
+            panic!("Not a Img file.");
+        }
+    }
+}
+use std::collections::VecDeque;
+use std::collections::HashMap;
+impl V2img{
+    pub fn default() -> Self {
+        V2img{versin:2,name:"".to_string(),frames_size:0,frames: Vec::new()}
+    }
+    pub fn set_name(&mut self, name: String){
+        self.name = name;
+    }
+
+    pub fn read_header(&mut self,data:Vec<u8>){
+        let magic = &data[0..16];
+        verify_magic(magic.try_into().unwrap());
+        let frame_size_bytes = &data[28..32];
+        self.frames_size = i32::from_le_bytes(frame_size_bytes.try_into().unwrap());
+    }
+    pub fn read_frames(&mut self,data:Vec<u8>){
+        let frames: Vec<Box<dyn Frame>> = Vec::with_capacity(self.frames_size as usize);
+        let mut queue: VecDeque<u8> = VecDeque::from(data.clone());
+        let mut frmeinfo: Vec<HashMap<&str,i32>> = Vec::new();
+        for i in 0..self.frames_size {
+            let tp_byte:Vec<_>= queue.drain(..4).collect();
+            let tp = i32::from_le_bytes(tp_byte.try_into().unwrap());
+            let mut  map = HashMap::new();
+            if TYPE_REFERENCE==tp{
+                let mut ref_frame = ReferenceFrame::default();
+                ref_frame.tp = tp;
+                let ref_c:Vec<u8> = queue.drain(..4).collect();
+                let ref_s = i32::from_le_bytes(ref_c.try_into().unwrap());
+                map.insert("tp", tp);
+                map.insert("ref", ref_s);
+                
+            }else{ 
+                let compressed  = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+                map.insert("compressed", compressed);
+                let width = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+                map.insert("width", width);
+                let height = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+                map.insert("height", height);
+                let length = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+                map.insert("length", length);
+                let x = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+                map.insert("x", x);
+                let y = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+                map.insert("y", y);
+                let frame_width = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+                map.insert("frame_width", frame_width);
+                let frame_height = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+                map.insert("frame_height", frame_height);
+                
+            }
+            frmeinfo.push(map);
+        }
+        for i in 0..self.frames_size {
+            let mut f = frmeinfo.get_mut(i as usize).unwrap();
+            let tp = f.get("tp").unwrap();
+            if is_reference_type(*tp){
+                let temp = f.get("ref").unwrap(); 
+            }else{
+                
+
+
+
+            }
+
+
+        }
+
+    }
+
+
+}
+
+ 
+
+fn read_frame(q:&mut VecDeque<u8>,tp:i32 )->HashMap<&str,i32>{
+    let mut  map = HashMap::new();
+    if TYPE_REFERENCE==tp{
+        let mut ref_frame = ReferenceFrame::default();
+        ref_frame.tp = tp;
+        let ref_c:Vec<u8> = q.drain(..4).collect();
+        let ref_s = i32::from_le_bytes(ref_c.try_into().unwrap());
+        map.insert("tp", tp);
+        map.insert("ref", ref_s);
+        map
+    }else{ 
+        let compressed  = i32::from_le_bytes(q.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+        map.insert("compressed", compressed);
+        let width = i32::from_le_bytes(q.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+        map.insert("width", width);
+        let height = i32::from_le_bytes(q.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+        map.insert("height", height);
+        let length = i32::from_le_bytes(q.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+        map.insert("length", length);
+        let x = i32::from_le_bytes(q.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+        map.insert("x", x);
+
+        let y = i32::from_le_bytes(q.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+        map.insert("y", y);
+        let frame_width = i32::from_le_bytes(q.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+        map.insert("frame_width", frame_width);
+        let frame_height = i32::from_le_bytes(q.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
+        map.insert("frame_height", frame_height);
+        map
+    }
+}
+
+
 
 static MAX_COLOR_SIZE:i32 = 255;
 use image::Rgba; 
+#[derive(Default, Debug)]
 pub struct Palette{
     colors:Vec<Rgba<u8>>
 
 }
-
+ 
 pub struct V4img{
     versin:i32,
     name:String,
@@ -215,11 +334,15 @@ pub struct V4img{
     frames:Vec<Box<dyn Frame>>
 }
 
-
+impl V4img{
+    pub fn default() -> Self {
+        V4img{versin:2,name:"".to_string(),palette:Palette::default(), frames: Vec::new()}
+    }
+}
 
 
 static DDS_IMAGE:&str = "DDS";
-
+#[derive(Default, Debug)]
 pub struct DDS{
     title:i32,
     pixel_format: i32,
@@ -232,37 +355,50 @@ pub struct DDS{
 }
 
 use indexmap::IndexMap;
+#[derive(Default, Debug)]
 pub struct Ddsable{
     idxm:IndexMap<i32,DDS>
 }
-
+ 
 pub struct V5img{
     versin:i32,
     name:String,
     dds_table:Ddsable,
     frames:Vec<Box<dyn Frame>>
 }
+impl V5img{
+    pub fn default() -> Self {
+        V5img{versin:2,name:"".to_string(),dds_table:Ddsable::default(), frames: Vec::new()}
+    }
+}
 
+ 
 pub struct V6img{
     versin:i32,
     name:String,
     palettes:Vec<Palette>,
     frames:Vec<Box<dyn Frame>>
 }
-
-pub trait Img:Access{
+impl V6img{
+    pub fn default() -> Self {
+        V6img{versin:2,name:"".to_string(),palettes:Vec::new(), frames: Vec::new()}
+    }
+}
+pub trait Img{
     fn add_ref_frame(&mut self,index:usize,ref_index:usize);
     fn add_frame(&mut self,index:usize,f:Box<dyn Frame>);
-    fn add_frame_tp(&mut self,index:usize,tp:i32,pic:RgbaImage);
-    fn get_frame_size(&self,index:usize)->i32;
-    fn get_image(&self,index:usize)->Box<dyn Frame>;
+    fn add_frame_tp(&mut self,index:usize,tp:i32,pic:RgbaImage); 
+    fn get_frame(&self,index:usize)->Box<dyn Frame>;
     fn get_name(&self)->String;
     fn get_version(&self)->i32;
 }
 
+
+ 
+
 impl Img for V2img{
 
-    fn 
+     
     fn add_ref_frame(&mut self,index:usize,ref_index:usize){
         let ref_frame = &self.frames[index];
         let mut rf: ReferenceFrame = ReferenceFrame::default(); 
@@ -314,12 +450,34 @@ impl Img for V2img{
         temp_image.y = miny;
         temp_image.frame_width = pic.width();
         temp_image.frame_height = pic.height();
-        temp_image.image = pic;
-        temp_image.raw_data = pic.to_vec();
+        temp_image.raw_data = pic.into_vec();
+     
+        
         self.add_frame(index,Box::new(temp_image));
 
 
 
     }
+
+    fn get_frame(&self,index:usize)->Box<dyn Frame> {
+        let temp = self.frames.get(index).unwrap();
+        if temp.is_reference(){
+            let rf = temp.as_any().downcast_ref::<ReferenceFrame>().unwrap().clone();
+            return self.get_frame(rf.reference)
+        }else {
+            return Box::new(temp.as_any().downcast_ref::<ImageFrame>().unwrap().clone());
+        }
+    }
+
+    fn get_name(&self)->String{
+        self.name.clone()
+    }
+
+    fn get_version(&self)->i32{
+        self.versin
+    }
+
+   
+
 
 }

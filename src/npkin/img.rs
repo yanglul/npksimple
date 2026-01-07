@@ -65,6 +65,7 @@ pub enum COMPRESSEDT{
 
  
 use bevy::ecs::relationship::RelationshipSourceCollection;
+use bevy::reflect::Reflect;
 use bevy::utils::default;
 use image::{ImageBuffer,RgbaImage };
 #[derive(Debug,Clone)]
@@ -196,11 +197,12 @@ impl Frame for DdsImageFrame{
     fn reference_push_back(&mut self, _: usize) { todo!() }
 }
 
-pub struct V2img{
+pub struct  V2img<'a>{
     versin:i32,
     name:String,
     frames_size:i32,
-    frames:Vec<Box<dyn Frame>>
+    frames:Vec<HashMap<&'a str,i32>>,
+    row_datas:HashMap<i32, Vec<u8>>,
 }
 use crate::npkin::NPK_MAGIC;
 fn verify_magic(mc:[u8;16]){
@@ -212,9 +214,9 @@ fn verify_magic(mc:[u8;16]){
 }
 use std::collections::VecDeque;
 use std::collections::HashMap;
-impl V2img{
+impl V2img <'_>{
     pub fn default() -> Self {
-        V2img{versin:2,name:"".to_string(),frames_size:0,frames: Vec::new()}
+        V2img{versin:2,name:"".to_string(),frames_size:0,frames: Vec::new(),row_datas:HashMap::new()}
     }
     pub fn set_name(&mut self, name: String){
         self.name = name;
@@ -227,9 +229,9 @@ impl V2img{
         self.frames_size = i32::from_le_bytes(frame_size_bytes.try_into().unwrap());
     }
     pub fn read_frames(&mut self,data:Vec<u8>){
-        let frames: Vec<Box<dyn Frame>> = Vec::with_capacity(self.frames_size as usize);
         let mut queue: VecDeque<u8> = VecDeque::from(data.clone());
         let mut frmeinfo: Vec<HashMap<&str,i32>> = Vec::new();
+        let mut frme_data_info: HashMap<i32,Vec<u8>> = HashMap::new();
         for i in 0..self.frames_size {
             let tp_byte:Vec<_>= queue.drain(..4).collect();
             let tp = i32::from_le_bytes(tp_byte.try_into().unwrap());
@@ -242,7 +244,9 @@ impl V2img{
                 map.insert("tp", tp);
                 map.insert("ref", ref_s);
                 
-            }else{ 
+            }else{
+                map.insert("tp", tp);
+                map.insert("ref", i);
                 let compressed  = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
                 map.insert("compressed", compressed);
                 let width = i32::from_le_bytes(queue.drain(..4).collect::<Vec<u8>>().try_into().unwrap());
@@ -264,20 +268,18 @@ impl V2img{
             frmeinfo.push(map);
         }
         for i in 0..self.frames_size {
-            let mut f = frmeinfo.get_mut(i as usize).unwrap();
+            let f = frmeinfo.get(i as usize).unwrap();
             let tp = f.get("tp").unwrap();
-            if is_reference_type(*tp){
-                let temp = f.get("ref").unwrap(); 
-            }else{
-                
-
-
-
+            if !is_reference_type(*tp){
+                let length = *f.get("length").unwrap() as usize;
+                let row_data:Vec<u8> = queue.drain(..length).collect::<Vec<u8>>().try_into().unwrap();
+                frme_data_info.insert(i, row_data);
             }
 
 
         }
-
+        self.frames = frmeinfo;
+        self.row_datas = frme_data_info;
     }
 
 
@@ -388,7 +390,7 @@ pub trait Img{
     fn add_ref_frame(&mut self,index:usize,ref_index:usize);
     fn add_frame(&mut self,index:usize,f:Box<dyn Frame>);
     fn add_frame_tp(&mut self,index:usize,tp:i32,pic:RgbaImage); 
-    fn get_frame(&self,index:usize)->Box<dyn Frame>;
+    fn get_frame(&self,index:usize)->Box<Vec<u8>>;
     fn get_name(&self)->String;
     fn get_version(&self)->i32;
 }
@@ -396,38 +398,15 @@ pub trait Img{
 
  
 
-impl Img for V2img{
+impl Img for V2img<'_>{
 
      
     fn add_ref_frame(&mut self,index:usize,ref_index:usize){
-        let ref_frame = &self.frames[index];
-        let mut rf: ReferenceFrame = ReferenceFrame::default(); 
-        rf.reference = ref_index;
-        rf.tp = TYPE_REFERENCE;
-        rf.frame = Box::new(ref_frame.as_any().downcast_ref::<ImageFrame>().unwrap().clone());
-        for f in  &mut self.frames{
-            if f.is_reference(){
-                let temp = f.as_any().downcast_ref::<ReferenceFrame>().unwrap().clone();
-                if temp.reference>= index{
-                    f.reference_push_back(1);
-                }
-                
-            }
-        }
-        &self.frames.insert(index,Box::new(rf));
+        
     }
 
     fn add_frame(&mut self,index:usize,f:Box<dyn Frame>){
-        for f in  &mut self.frames{
-            if f.is_reference(){
-                let temp = f.as_any().downcast_ref::<ReferenceFrame>().unwrap().clone();
-                if temp.reference>= index{
-                    f.reference_push_back(1);
-                }
-                
-            }
-        }
-        self.frames.insert(index,f);
+        
     }
     fn add_frame_tp(&mut self,index:usize,tp:i32,pic:RgbaImage){
         let mut temp_image = ImageFrame::default();
@@ -459,14 +438,10 @@ impl Img for V2img{
 
     }
 
-    fn get_frame(&self,index:usize)->Box<dyn Frame> {
+    fn get_frame(&self,index:usize)->Box<Vec<u8>> {
         let temp = self.frames.get(index).unwrap();
-        if temp.is_reference(){
-            let rf = temp.as_any().downcast_ref::<ReferenceFrame>().unwrap().clone();
-            return self.get_frame(rf.reference)
-        }else {
-            return Box::new(temp.as_any().downcast_ref::<ImageFrame>().unwrap().clone());
-        }
+        let ref_c = temp.get("ref").unwrap();
+        Box::new(self.row_datas.get(ref_c).unwrap().clone())
     }
 
     fn get_name(&self)->String{

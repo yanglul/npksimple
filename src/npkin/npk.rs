@@ -2,16 +2,16 @@ use crate::npkin::img::{Imgindex, V2img, V4img, V5img, V6img};
 use crate::npkin::oggv::Ogg;
 
  
-pub enum Texture{
+pub enum Texture<'a>{
     Ogg(Ogg),
-    V2(V2img),
+    V2(V2img<'a>),
     V4(V4img),
     V5(V5img),
     V6(V6img),
 }
 
 #[derive(Default)]
-pub struct Npk{
+pub struct Npk<'a>{
     //文件头
     pub head:[u8;20],
     //img索引表
@@ -21,7 +21,7 @@ pub struct Npk{
     //图片数量
     pub img_count:i32,
  
-    pub textures: Vec<Texture>,
+    pub textures: Vec<Texture<'a>>,
 
 
 
@@ -34,7 +34,7 @@ use std::io::SeekFrom;
 use std::io::Seek;
 use std::fs::File;
 
-impl Npk{
+impl <'a> Npk <'a>{
     pub fn read(&mut self,mut r:BufReader<File>)->Result<()>{
         r.read_exact(&mut self.head)?;
         let mut img_count_byte:[u8;4] = [self.head[16],self.head[17],self.head[18],self.head[19]];
@@ -77,22 +77,24 @@ impl Npk{
                  
                 match version {
                     2 =>{
+                        println!("V2");
                         let mut v2img = V2img::default();
                         v2img.set_name(check_name);
                         let frame_size_bytes = &data[28..32];
                         let frame_size = i32::from_le_bytes(frame_size_bytes.try_into().unwrap());
-                        
-
-
+                        let head = &data[0..32];
+                        v2img.read_header(head.to_vec());
+                        v2img.read_frames(data[32..].to_vec());
+                        self.textures.push(Texture::V2(v2img));
                     },
                     4=>{
-
+                        println!("V4");
                     },
                     5=>{
-
+                        println!("V5");
                     },
                     6=>{
-
+                        println!("V6");
                     },
                     _=>{
                         panic!("未知版本图片")
